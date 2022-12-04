@@ -1,4 +1,6 @@
-class Player:
+#class Player:
     
     
     
+def playertest():
+    return "hi"
