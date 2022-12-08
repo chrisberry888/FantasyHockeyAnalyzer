@@ -9,7 +9,7 @@ def driver():
     path = os.getcwd()
     data_path = path + '\\data'
     df = pd.read_csv(data_path + '\skaters21-22.csv')
-    print(df["I_F_goals"])
+    print(df["onIce_xGoalsPercentage"])
 
 
 driver()
