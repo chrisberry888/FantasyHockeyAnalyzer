@@ -24,6 +24,23 @@ def driver():
         print(label)
         if label == "Goals":
             fantasy_points = np.add(fantasy_points, [5*int(num) for num in df.loc[:, label]])
+        if label == "Assists":
+            fantasy_points = np.add(fantasy_points, [3*int(num) for num in df.loc[:, label]])
+        if label == "+/-":
+            fantasy_points = np.add(fantasy_points, [1.5*int(num) for num in df.loc[:, label]])
+        if label == "PIM":
+            fantasy_points = np.add(fantasy_points, [-.25*int(num) for num in df.loc[:, label]])
+        if label == "PP_Goals":
+            fantasy_points = np.add(fantasy_points, [4*int(num) for num in df.loc[:, label]])
+        if label == "PP_Assists":
+            fantasy_points = np.add(fantasy_points, [2*int(num) for num in df.loc[:, label]])
+        if label == "SH_Goals":
+            fantasy_points = np.add(fantasy_points, [6*int(num) for num in df.loc[:, label]])
+        if label == "SH_Assists":
+            fantasy_points = np.add(fantasy_points, [4*int(num) for num in df.loc[:, label]])
+        if label == "+/-":
+            fantasy_points = np.add(fantasy_points, [5*int(num) for num in df.loc[:, label]])
+        
     print(fantasy_points)
     print(df.loc[:, "Goals"])
 driver()
