@@ -1,4 +1,6 @@
 import pandas as pd
+from sklearn.base import clone
+from sklearn.model_selection import train_test_split
 
 #Creates ML-model readable data from past year data
 def merge_dataframes(arr, points_df):
@@ -65,3 +67,22 @@ def check_duplicate_names(df):
     else:
         return False
 
+
+
+def sum_predictions(dfs):
+    # Concatenate all DataFrames in the list
+    concatenated_df = pd.concat(dfs)
+    
+    # Group by 'Name' and sum 'Prediction'
+    summed_df = concatenated_df.groupby('Name')['Prediction'].sum().reset_index()
+    
+    return summed_df
+
+def sim(regr, X, y, sims):
+    models = []
+    for i in range(sims):
+        temp = clone(regr)
+        X_train, X_test, y_train, y_test = train_test_split(X, y)
+        temp.fit(X_train, y_train)
+        models.append(temp)
+    return models
