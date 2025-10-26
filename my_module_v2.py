@@ -21,3 +21,19 @@ def get_rotowire_data(year):
     rotowire_data = pd.read_csv(path_to_rotowire_data, header=1)
     return rotowire_data
 
+def combine_dataframes(moneypuck_df, rotowire_df):
+    '''Formats then combines the moneypuck and rotowire dataframes.'''
+    rotowire_df = rotowire_df[["Player Name", "Team", "Pos", "+/-"]]
+    rotowire_df = rotowire_df.rename(columns = {
+        'Player Name': 'name',
+        'Team': 'team',
+        'Pos': 'position'
+    })
+    rotowire_df['position'] = rotowire_df['position'].replace({
+        'LW': 'L',
+        'RW': 'R'
+    })
+
+    moneypuck_df = moneypuck_df[moneypuck_df['situation'] == "all"]
+
+
