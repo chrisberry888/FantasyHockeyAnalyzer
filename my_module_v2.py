@@ -73,27 +73,41 @@ def pivot_data(df):
 
 def preformat_moneypuck_df(df):
     '''Prepares the moneypuck dataframe for merging.'''
-    df = rename_situation_column(df)
+    # df = rename_situation_column(df)
     df = pivot_data(df)
     return df
     
+
 def get_rid_of_irrelevant_rotowire_columns(df):
     filter_columns = [
         'Player Name', 
         'Games', 
         'SOG', 
         'Hits',
-        '+/-'
+        '+/-',
+        'A',
+        'G.1', #power play/short handed stats are imported like this
+        'A.1',
+        'G.2',
+        'A.2'
     ]
     df = df[filter_columns]
     return df
 
 
 def rename_rotowire_columns(df):
+    rename_dict_1 = {
+        'A': 'Assists',
+        'G.1': 'PP_Goals',
+        'A.1': 'PP_Assists',
+        'G.2': 'SH_Goals',
+        'A.2': 'SH_Assists'
+    }
     moneypuck_columns = ['name', 'games_played', 'all_I_F_shotsOnGoal', 'all_I_F_hits']
     rotowire_columns = ['Player Name', 'Games', 'SOG', 'Hits']
-    rename_dict = dict(zip(rotowire_columns, moneypuck_columns))
-    df = df.rename(columns=rename_dict)
+    rename_dict_2 = dict(zip(rotowire_columns, moneypuck_columns))
+    df = df.rename(columns=rename_dict_1)
+    df = df.rename(columns=rename_dict_2)
     return df
 
 
@@ -118,18 +132,15 @@ def format_fantasy_columns(df):
         'Assists': 'Assists',
         '+/-': '+/-',
         'all_I_F_penalityMinutes': 'PIM',
-        'PP_I_F_goals': 'PP_Goals',
+        'PP_Goals': 'PP_Goals',
         'PP_Assists': 'PP_Assists',
-        'SH_I_F_goals': 'SH_Goals',
+        'SH_Goals': 'SH_Goals',
         'SH_Assists': 'SH_Assists',
         'all_faceoffsWon': 'Faceoffs_Won',
         'all_faceoffsLost': 'Faceoffs_Lost',
         'all_I_F_hits': 'Hits',
         'all_shotsBlockedByPlayer': 'Blocked_Shots'
     }
-    df['Assists'] = df['all_I_F_primaryAssists'] + df['all_I_F_secondaryAssists']
-    df['PP_Assists'] = df['PP_I_F_primaryAssists'] + df['PP_I_F_secondaryAssists']
-    df['SH_Assists'] = df['SH_I_F_primaryAssists'] + df['SH_I_F_secondaryAssists']
     df = df.rename(columns=rename_dict)
     return df
 
