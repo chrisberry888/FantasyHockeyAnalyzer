@@ -43,17 +43,17 @@ def get_rotowire_data(year):
     rotowire_data = pd.read_csv(path_to_rotowire_data, header=1)
     return rotowire_data
 
-def rename_situation_column(df):
-    '''Renames the elements in the situation column in the moneypuck data.'''
-    rename_dict = {
-        'other': 'other',
-        'all': 'all',
-        '5on5': 'full_strength',
-        '4on5': 'SH',
-        '5on4': 'PP'
-    }
-    df['situation'] = df['situation'].replace(rename_dict)
-    return df
+# def rename_situation_column(df):
+#     '''Renames the elements in the situation column in the moneypuck data.'''
+#     rename_dict = {
+#         'other': 'other',
+#         'all': 'all',
+#         '5on5': 'full_strength',
+#         '4on5': 'SH',
+#         '5on4': 'PP'
+#     }
+#     df['situation'] = df['situation'].replace(rename_dict)
+#     return df
 
 def pivot_data(df):
     '''Puts the data from the different situations (5on5, 5on4, etc) into the same row.'''
@@ -158,4 +158,27 @@ def calculate_fantasy_points(df, points_dictionary):
     '''Adds a column with each player's fantasy output for that year'''
     df['Fantasy_Points'] = sum(df[col] * multiplier for col, multiplier in points_dictionary.items())
     return df
+
+
+def merge_dataframes_for_ml(list_of_dataframes, points_df):
+    final_df = pd.DataFrame()
+    list_of_dataframes = [df.drop(columns=['Fantasy_Points']) for df in list_of_dataframes]
+    for df in list_of_dataframes:
+        final_df = pd.merge(final_df, df, on=)
+
+
+def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
+    '''Gets the dataframes that will be used by the ML model trainers.'''
+    final_df = pd.DataFrame()
+    first_year_with_data = 2010
+    last_year_with_data = current_year - number_of_years_per_row
+    for year in range(first_year_with_data, last_year_with_data):
+        first_index = year - first_year_with_data
+        last_index = first_index + number_of_years_per_row
+        arr = [yearly_player_data[i] for i in range(first_index, last_index)]
+        ml_data = merge_dataframes_for_ml(arr, yearly_player_data[year + number_of_years_per_row])
+        
+        #does pd.concat do what you want?
+        final_df = pd.concat([final_df, ml_data], ignore_index=True)
+    return final_df
 
