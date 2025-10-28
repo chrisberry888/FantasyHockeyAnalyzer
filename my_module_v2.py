@@ -195,3 +195,9 @@ def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
         final_df = pd.concat([final_df, ml_data], ignore_index=True)
     return final_df
 
+
+def separate_fantasy_points(df):
+    fantasy_points = df['Fantasy_Points'].tolist()
+    df = df.drop(columns=['Fantasy_Points'])
+    return (df, fantasy_points)
+
