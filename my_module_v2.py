@@ -31,11 +31,13 @@ def get_data_path():
     data_path = path + '/data'
     return data_path
 
+
 def get_moneypuck_data(year):
     '''Gets the moneypuck data for the passed year.'''
     path_to_moneypuck_data = get_data_path() + '/moneypuck_data/moneypuck{}.csv'.format(str(year))
     moneypuck_data = pd.read_csv(path_to_moneypuck_data)
     return moneypuck_data
+
 
 def get_rotowire_data(year):
     '''Gets the rotowire data for the passed year.'''
@@ -122,6 +124,7 @@ def merge_dataframes(moneypuck_df, rotowire_df):
     '''Merges the two dataframes (after they've already been preformatted).'''
     primary_keys = ['name', 'games_played', 'all_I_F_shotsOnGoal', 'all_I_F_hits']
     merged_df = pd.merge(moneypuck_df, rotowire_df, on=primary_keys)
+    merged_df = replace_team_abbreviations(merged_df)
     return merged_df
 
 
@@ -176,7 +179,11 @@ def merge_dataframes_for_ml(list_of_dataframes, points_df):
     return final_df
 
     
-
+def encode_data(df):
+    '''Encodes string data as floats (and drops irrelevant columns).'''
+    df = df.drop(columns=['name'])
+    df = pd.get_dummies(df, columns=['team', 'position'])
+    return df
 
 
 def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
@@ -193,6 +200,7 @@ def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
         
         #does pd.concat do what you want?
         final_df = pd.concat([final_df, ml_data], ignore_index=True)
+    final_df = encode_data(final_df)
     return final_df
 
 
@@ -201,3 +209,12 @@ def separate_fantasy_points(df):
     df = df.drop(columns=['Fantasy_Points'])
     return (df, fantasy_points)
 
+
+def create_models(X, y, blank_model, number_of_models):
+    models = []
+    for i in range(number_of_models):
+        current_model = clone(blank_model)
+        X_train, X_test, y_train, y_test = train_test_split(X, y)
+        current_model.fit(X_train, y_train)
+        models.append(current_model)
+    return models
