@@ -163,19 +163,21 @@ def calculate_fantasy_points(df, points_dictionary):
     return df
 
 
-def merge_dataframes_for_ml(list_of_dataframes, points_df):
-    '''Merges the dataframes in list_of_dataframes, then tacks on the Fantasy_Points column from points_df.'''
+def merge_dataframes_for_ml(list_of_dataframes, points_df=None):
+    '''
+    Merges the dataframes in list_of_dataframes, then tacks on the Fantasy_Points column from points_df.
+    If points_df isn't passed in, then it's the dataframe for the most recent year.
+    '''
     list_of_dataframes = [df.drop(columns=['Fantasy_Points']) for df in list_of_dataframes]
     final_df = list_of_dataframes[0]
-    # rename_dict = {c: f'{c}_0' for c in final_df.columns if c != 'playerId'}
-    # final_df = final_df.rename(columns=rename_dict)
     for index, df in enumerate(list_of_dataframes):
         if index == 0:
             continue
         final_df = pd.merge(final_df, df, on='playerId', suffixes=(None, f'_{index}'))
 
-    points_df = points_df[['playerId', 'Fantasy_Points']]
-    final_df = pd.merge(final_df, points_df, on='playerId')
+    if points_df is not None:
+        points_df = points_df[['playerId', 'Fantasy_Points']]
+        final_df = pd.merge(final_df, points_df, on='playerId')
     return final_df
 
     
@@ -194,13 +196,12 @@ def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
     for year in range(first_year_with_data, last_year_with_data):
         first_index = year - first_year_with_data
         last_index = first_index + number_of_years_per_row
-        arr = [yearly_player_data[i] for i in range(first_index, last_index)]
-        # print(f'{year}    {first_index + number_of_years_per_row}')
-        ml_data = merge_dataframes_for_ml(arr, yearly_player_data[first_index + number_of_years_per_row])
+        relevant_dfs = [encode_data(yearly_player_data[i]) for i in range(first_index, last_index)]
+        ml_data = merge_dataframes_for_ml(relevant_dfs, yearly_player_data[first_index + number_of_years_per_row])
         
         #does pd.concat do what you want?
         final_df = pd.concat([final_df, ml_data], ignore_index=True)
-    final_df = encode_data(final_df)
+    # final_df = encode_data(final_df)
     return final_df
 
 
@@ -218,3 +219,12 @@ def create_models(X, y, blank_model, number_of_models):
         current_model.fit(X_train, y_train)
         models.append(current_model)
     return models
+
+
+def get_final_year_data(yearly_player_data, number_of_years):
+    '''Returns data that can be used by the already-created models'''
+    first_index = number_of_years * -1
+    relevant_dfs = [encode_data(yearly_player_data[i]) for i in range(first_index, 0)]
+    final_df = merge_dataframes_for_ml(relevant_dfs)
+    return final_df
+    
