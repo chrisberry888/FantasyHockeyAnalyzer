@@ -1,9 +1,10 @@
 import os
 import pandas as pd
+from pandas import DataFrame
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
-def replace_team_abbreviations(df):
+def replace_team_abbreviations(df: DataFrame) -> DataFrame:
     '''Replaces the team abbreviation to the most updated one.'''
     abbreviation_table = {
         'ANH': 'ANA',
@@ -45,19 +46,23 @@ def get_rotowire_data(year):
     rotowire_data = pd.read_csv(path_to_rotowire_data, header=1)
     return rotowire_data
 
-# def rename_situation_column(df):
-#     '''Renames the elements in the situation column in the moneypuck data.'''
-#     rename_dict = {
-#         'other': 'other',
-#         'all': 'all',
-#         '5on5': 'full_strength',
-#         '4on5': 'SH',
-#         '5on4': 'PP'
-#     }
-#     df['situation'] = df['situation'].replace(rename_dict)
-#     return df
 
-def pivot_data(df):
+def get_player_id_table(yearly_player_data):
+    '''Gets a table that translates playerIds to names/positions/teams'''
+    all_years = pd.concat(yearly_player_data)
+    all_years = all_years[['playerId', 'season', 'name', 'team', 'position']]
+
+    # Sorts by season (highest first), then keeps the first row for each playerId
+    final_df = all_years.sort_values('season', ascending=False).drop_duplicates(subset='playerId')
+
+    final_df = pd.DataFrame({
+        'playerId': final_df['playerId'],
+        'name': final_df['name'].astype(str) + '_' + final_df['team'].astype(str) + '_' + final_df['season'].astype(str) + '_' + final_df['position'].astype(str)
+    })
+    return final_df
+
+
+def pivot_data(df: DataFrame) -> DataFrame:
     '''Puts the data from the different situations (5on5, 5on4, etc) into the same row.'''
     key_columns = [
         'playerId',
@@ -73,14 +78,15 @@ def pivot_data(df):
     return final_df
 
 
-def preformat_moneypuck_df(df):
+def preformat_moneypuck_df(df: DataFrame) -> DataFrame:
     '''Prepares the moneypuck dataframe for merging.'''
     # df = rename_situation_column(df)
     df = pivot_data(df)
     return df
     
 
-def get_rid_of_irrelevant_rotowire_columns(df):
+def get_rid_of_irrelevant_rotowire_columns(df: DataFrame) -> DataFrame:
+    '''Returns a new dataframe, only with the columns we want from the rotowire dataframe'''
     filter_columns = [
         'Player Name', 
         'Games', 
@@ -97,7 +103,7 @@ def get_rid_of_irrelevant_rotowire_columns(df):
     return df
 
 
-def rename_rotowire_columns(df):
+def rename_rotowire_columns(df: DataFrame) -> DataFrame:
     rename_dict_1 = {
         'A': 'Assists',
         'G.1': 'PP_Goals',
@@ -113,7 +119,7 @@ def rename_rotowire_columns(df):
     return df
 
 
-def preformat_rotowire_df(df):
+def preformat_rotowire_df(df: DataFrame) -> DataFrame:
     '''Prepares the rotowire dataframe for merging.'''
     df = get_rid_of_irrelevant_rotowire_columns(df)
     df = rename_rotowire_columns(df)
@@ -128,7 +134,7 @@ def merge_dataframes(moneypuck_df, rotowire_df):
     return merged_df
 
 
-def format_fantasy_columns(df):
+def format_fantasy_columns(df: DataFrame) -> DataFrame:
     '''Adds all columns needed to calculate fantasy points'''
     rename_dict = {
         'all_I_F_goals': 'Goals',
@@ -181,10 +187,18 @@ def merge_dataframes_for_ml(list_of_dataframes, points_df=None):
     return final_df
 
     
-def encode_data(df):
+def encode_data(df: DataFrame) -> DataFrame:
     '''Encodes string data as floats (and drops irrelevant columns).'''
     df = df.drop(columns=['name'])
     df = pd.get_dummies(df, columns=['team', 'position'])
+    return df
+
+
+def ml_data_post_processing(df: DataFrame) -> DataFrame:
+    '''Replaces any NaN's with False, and sorts the columns alphabetically to make sklearn not angry'''
+    df = df.fillna(False)
+    sorted_column_names = sorted(df.columns)
+    df = df[sorted_column_names]
     return df
 
 
@@ -201,7 +215,7 @@ def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
         
         #does pd.concat do what you want?
         final_df = pd.concat([final_df, ml_data], ignore_index=True)
-    # final_df = encode_data(final_df)
+    final_df = ml_data_post_processing(final_df)
     return final_df
 
 
@@ -226,5 +240,18 @@ def get_final_year_data(yearly_player_data, number_of_years):
     first_index = number_of_years * -1
     relevant_dfs = [encode_data(yearly_player_data[i]) for i in range(first_index, 0)]
     final_df = merge_dataframes_for_ml(relevant_dfs)
+    final_df = ml_data_post_processing(final_df)
     return final_df
     
+
+def get_prediction_table(models, input_data, player_id_table):
+    prediction_values = [0 for player in range(len(input_data))]
+    for model in models:
+        current_prediction = model.predict(input_data)
+        prediction_values = [x + y for x, y in zip(prediction_values, current_prediction)]
+    preds_df = pd.DataFrame({
+        'playerId': input_data['playerId'].values,
+        'prediction': prediction_values
+    })
+    final_df = pd.merge(player_id_table, preds_df, on='playerId').sort_values(by='prediction', ascending=False)
+    return final_df
