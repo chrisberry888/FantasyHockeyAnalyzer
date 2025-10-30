@@ -253,5 +253,5 @@ def get_prediction_table(models, input_data, player_id_table):
         'playerId': input_data['playerId'].values,
         'prediction': prediction_values
     })
-    final_df = pd.merge(player_id_table, preds_df, on='playerId').sort_values(by='prediction', ascending=False)
+    final_df = pd.merge(player_id_table, preds_df, on='playerId').sort_values(by='prediction', ascending=False).reset_index(drop=True)
     return final_df
