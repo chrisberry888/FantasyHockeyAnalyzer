@@ -1,8 +1,10 @@
 import os
 import pandas as pd
 from pandas import DataFrame
+import re
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
+import joblib
 
 def replace_team_abbreviations(df: DataFrame) -> DataFrame:
     '''Replaces the team abbreviation to the most updated one.'''
@@ -202,6 +204,7 @@ def ml_data_post_processing(df: DataFrame) -> DataFrame:
     return df
 
 
+# TODO: Clean up this function, make it more readable/make it more clear for the reader
 def get_ml_data(yearly_player_data, current_year, number_of_years_per_row):
     '''Gets the dataframes that will be used by the ML model trainers.'''
     final_df = pd.DataFrame()
@@ -225,14 +228,16 @@ def separate_fantasy_points(df):
     return (df, fantasy_points)
 
 
-def create_models(X, y, blank_model, number_of_models):
-    models = []
+def create_models(X, y, blank_model, number_of_models, folder_path):
+    '''Creates the ML models and dumps them into a file in the /models directory'''
+    path = os.getcwd()
+    full_folder_path = path +'/models' + folder_path
     for i in range(number_of_models):
         current_model = clone(blank_model)
         X_train, X_test, y_train, y_test = train_test_split(X, y)
         current_model.fit(X_train, y_train)
-        models.append(current_model)
-    return models
+        file_name = f'{full_folder_path}/model_{i}.joblib'
+        joblib.dump(current_model, file_name)
 
 
 def get_final_year_data(yearly_player_data, number_of_years):
@@ -255,3 +260,54 @@ def get_prediction_table(models, input_data, player_id_table):
     })
     final_df = pd.merge(player_id_table, preds_df, on='playerId').sort_values(by='prediction', ascending=False).reset_index(drop=True)
     return final_df
+
+
+def get_formatted_prediction_table(prediction, input_table, player_id_table):
+    '''Takes the raw predicion table as input with the player_id_table; returns the final useful table for this one model'''
+    preds_df = pd.DataFrame({
+        'playerId': input_table['playerId'].values,
+        'prediction': prediction
+    })
+    df = pd.merge(player_id_table, preds_df, on='playerId').sort_values(by='prediction', ascending=False).reset_index(drop=True)
+    return df
+
+
+def generate_predictions(year_data: tuple, player_id_table):
+    '''Iterates through all of the model files and generates predictions for all of them.'''
+    current_working_directory = os.getcwd()
+    lowest_directory_pattern = r'models/(1|2|3)_year/(neural_nets|random_forests)'
+    for directory, subdirectories, files in os.walk(f'{current_working_directory}/models'):
+        match = re.search(lowest_directory_pattern, directory)
+        if match:
+            correct_input = year_data[int(match.group(1)) - 1]
+            for i, model_name in enumerate(files):
+                current_model = joblib.load(f'{directory}/{model_name}')
+                current_prediction = current_model.predict(correct_input)
+                prediction_table = get_formatted_prediction_table(current_prediction, correct_input, player_id_table)
+                table_location = f'{current_working_directory}/predictions/{match.group(1)}_year/{match.group(2)}'
+                prediction_table.to_parquet(f'{table_location}/prediction_{i}.parquet')
+
+
+def generate_final_table():
+    '''Generates the ultimate predictions table based on the prediction parquet files'''
+    counter = 0
+    current_working_directory = os.getcwd()
+    final_df = pd.DataFrame()
+    for directory, subdirectories, files in os.walk(f'{current_working_directory}/predictions'):
+        for current_file in files:
+            counter += 1
+            current_path = f'{directory}/{current_file}'
+            current_df = pd.read_parquet(current_path)
+            final_df = pd.concat([final_df, current_df])
+        if not final_df.empty:
+            final_df = final_df.groupby(['playerId', 'name'])['prediction'].sum().reset_index()
+    final_df = final_df.sort_values(by='prediction', ascending=False).reset_index(drop=True)
+    if counter > 0:
+        final_df['prediction'] = final_df['prediction'] / counter
+    final_df.to_csv(f'{current_working_directory}/final_prediction.csv', index=False)
+
+
+def get_final_table():
+    current_working_directory = os.getcwd()
+    loaded_df = pd.read_csv(f'{current_working_directory}/final_prediction.csv')
+    return loaded_df

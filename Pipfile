@@ -10,6 +10,8 @@ jupyterlab = "*"
 numpy = "*"
 scikit-learn = "*"
 pandas = "*"
+pyarrow = "*"
+fastparquet = "*"
 
 [dev-packages]
 
