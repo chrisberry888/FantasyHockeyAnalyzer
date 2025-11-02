@@ -5,6 +5,7 @@ import re
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 import joblib
+from pathlib import Path
 
 def replace_team_abbreviations(df: DataFrame) -> DataFrame:
     '''Replaces the team abbreviation to the most updated one.'''
@@ -228,10 +229,22 @@ def separate_fantasy_points(df):
     return (df, fantasy_points)
 
 
-def create_models(X, y, blank_model, number_of_models, folder_path):
+def set_up_directory(base_path: str, subdirectory_name: str):
+    target_directory = Path(base_path) / subdirectory_name
+    if target_directory.exists():
+        # Delete all files
+        for item in target_directory.iterdir():
+            if item.is_file():
+                item.unlink() # 'unlink' is the pathlib method to delete a file
+    else:
+        target_directory.mkdir(parents=True)
+
+
+def create_models(X, y, blank_model, number_of_models, year_path_name, model_path_name):
     '''Creates the ML models and dumps them into a file in the /models directory'''
-    path = os.getcwd()
-    full_folder_path = path +'/models' + folder_path
+    base_path = os.getcwd()
+    set_up_directory(f'{base_path}/models/{year_path_name}', model_path_name)
+    full_folder_path = f'{base_path}/models/{year_path_name}/{model_path_name}'
     for i in range(number_of_models):
         current_model = clone(blank_model)
         X_train, X_test, y_train, y_test = train_test_split(X, y)
@@ -280,6 +293,9 @@ def generate_predictions(year_data: tuple, player_id_table):
         match = re.search(lowest_directory_pattern, directory)
         if match:
             correct_input = year_data[int(match.group(1)) - 1]
+            # Deletes all predictions that are currently in the predictions folder for this 
+            set_up_directory(f'{current_working_directory}/predictions/{match.group(1)}_year', match.group(2))
+            
             for i, model_name in enumerate(files):
                 current_model = joblib.load(f'{directory}/{model_name}')
                 current_prediction = current_model.predict(correct_input)
