@@ -6,6 +6,7 @@ from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 import joblib
 from pathlib import Path
+import requests
 
 def replace_team_abbreviations(df: DataFrame) -> DataFrame:
     '''Replaces the team abbreviation to the most updated one.'''
@@ -288,7 +289,7 @@ def get_formatted_prediction_table(prediction, input_table, player_id_table):
 def generate_predictions(year_data: tuple, player_id_table):
     '''Iterates through all of the model files and generates predictions for all of them.'''
     current_working_directory = os.getcwd()
-    lowest_directory_pattern = r'models/(1|2|3)_year/(neural_nets|random_forests)'
+    lowest_directory_pattern = r'models/(1|2|3)_year/(neural_nets|random_forests|boosted_trees)'
     for directory, subdirectories, files in os.walk(f'{current_working_directory}/models'):
         match = re.search(lowest_directory_pattern, directory)
         if match:
@@ -305,25 +306,57 @@ def generate_predictions(year_data: tuple, player_id_table):
 
 
 def generate_final_table():
-    '''Generates the ultimate predictions table based on the prediction parquet files'''
-    counter = 0
-    current_working_directory = os.getcwd()
-    final_df = pd.DataFrame()
-    for directory, subdirectories, files in os.walk(f'{current_working_directory}/predictions'):
-        for current_file in files:
-            counter += 1
-            current_path = f'{directory}/{current_file}'
-            current_df = pd.read_parquet(current_path)
-            final_df = pd.concat([final_df, current_df])
-        if not final_df.empty:
-            final_df = final_df.groupby(['playerId', 'name'])['prediction'].sum().reset_index()
+    '''Averages each player's available predictions and reports model coverage as a percentage.'''
+    current_working_directory = Path(os.getcwd())
+    prediction_paths = sorted((current_working_directory / 'predictions').rglob('*.parquet'))
+    if not prediction_paths:
+        raise ValueError('No prediction parquet files found.')
+
+    prediction_tables = []
+    for model_id, current_path in enumerate(prediction_paths):
+        current_df = pd.read_parquet(current_path)
+        # Give each model one contribution per player, even if a file repeats a player.
+        current_df = current_df.groupby(['playerId', 'name'], as_index=False)['prediction'].mean()
+        current_df = current_df.dropna(subset=['prediction'])
+        current_df['_model_id'] = model_id
+        prediction_tables.append(current_df)
+
+    all_predictions = pd.concat(prediction_tables, ignore_index=True)
+    final_df = all_predictions.groupby(['playerId', 'name'], as_index=False).agg(
+        prediction=('prediction', 'mean'),
+        _model_count=('_model_id', 'nunique')
+    )
+    final_df['model_coverage_pct'] = (100 * final_df['_model_count'] / len(prediction_paths)).round(1)
+    final_df = final_df.drop(columns=['_model_count'])
     final_df = final_df.sort_values(by='prediction', ascending=False).reset_index(drop=True)
-    if counter > 0:
-        final_df['prediction'] = final_df['prediction'] / counter
-    final_df.to_csv(f'{current_working_directory}/final_prediction.csv', index=False)
+    final_df.to_csv(current_working_directory / 'final_prediction.csv', index=False)
 
 
 def get_final_table():
     current_working_directory = os.getcwd()
     loaded_df = pd.read_csv(f'{current_working_directory}/final_prediction.csv')
     return loaded_df
+
+
+
+def get_nhl_players() -> pd.DataFrame:
+    base = "https://api.nhle.com/stats/rest/en"
+    teams = requests.get(f"{base}/team", timeout=30).json()["data"]
+
+    rows = []
+    for team in teams:
+        players = requests.get(
+            f"{base}/players",
+            params={"limit": 1000, "cayenneExp": f"currentTeamId={team['id']}"},
+            timeout=30,
+        ).json()["data"]
+        rows += [
+            {
+                "player_id": p["id"],
+                "team_abbrev": team["triCode"],
+                "position": p["positionCode"],
+            }
+            for p in players
+        ]
+
+    return pd.DataFrame(rows, columns=["player_id", "team_abbrev", "position"])
