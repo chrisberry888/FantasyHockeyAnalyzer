@@ -1,6 +1,7 @@
 import os
 import errno
 import json
+import shutil
 import tempfile
 import pandas as pd
 from pandas import DataFrame
@@ -333,6 +334,24 @@ def set_up_directory(base_path: str, subdirectory_name: str):
         target_directory.mkdir(parents=True)
 
 
+def reset_model_and_prediction_directories():
+    '''Clears all contents of the project's models and predictions directories.'''
+    directories = [Path(os.getcwd()) / name for name in ('models', 'predictions')]
+    for directory in directories:
+        if directory.is_symlink():
+            raise ValueError(f'Refusing to reset a linked output directory: {directory}')
+        if directory.exists() and not directory.is_dir():
+            raise NotADirectoryError(directory)
+
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
+        for item in directory.iterdir():
+            if item.is_symlink() or not item.is_dir():
+                item.unlink()
+            else:
+                shutil.rmtree(item)
+
+
 def _atomic_write(path, write_contents):
     '''Flushes a temporary file to disk before publishing its final filename.'''
     path = Path(path)
@@ -397,6 +416,10 @@ def _completed_model_matches(path, metadata):
 def create_models(X, y, blank_model, number_of_models, year_path_name, model_path_name,
                   resume_training=True):
     '''Saves models individually, optionally resuming an interrupted matching run.'''
+    fresh_start_hint = (
+        'Set create_new_models=True in the notebook for a full reset. '
+        'For direct calls, use resume_training=False to start this model group fresh.'
+    )
     full_folder_path = Path(os.getcwd()) / 'models' / year_path_name / model_path_name
     metadata = _training_metadata(X, y, blank_model, number_of_models)
     metadata_path = full_folder_path / 'training_metadata.json'
@@ -407,18 +430,18 @@ def create_models(X, y, blank_model, number_of_models, year_path_name, model_pat
             except (OSError, ValueError) as error:
                 raise ValueError(
                     f'Cannot verify training metadata in {full_folder_path}. '
-                    'Use resume_training=False to start this model group fresh.'
+                    + fresh_start_hint
                 ) from error
             if saved_metadata != metadata:
                 raise ValueError(
                     f'Training data, features, settings, or versions changed for '
                     f'{year_path_name}/{model_path_name}. '
-                    'Use resume_training=False to start this model group fresh.'
+                    + fresh_start_hint
                 )
         elif full_folder_path.exists() and any(full_folder_path.glob('model_*.joblib')):
             raise ValueError(
                 f'Saved models in {full_folder_path} have no training metadata. '
-                'Use resume_training=False to start this model group fresh.'
+                + fresh_start_hint
             )
         full_folder_path.mkdir(parents=True, exist_ok=True)
     else:
