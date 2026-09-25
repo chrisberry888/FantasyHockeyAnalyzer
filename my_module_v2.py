@@ -107,7 +107,8 @@ def get_rid_of_irrelevant_rotowire_columns(df: DataFrame) -> DataFrame:
         'G.1', #power play/short handed stats are imported like this
         'A.1',
         'G.2',
-        'A.2'
+        'A.2',
+        'GWG'
     ]
     df = df[filter_columns]
     return df
@@ -119,7 +120,8 @@ def rename_rotowire_columns(df: DataFrame) -> DataFrame:
         'G.1': 'PP_Goals',
         'A.1': 'PP_Assists',
         'G.2': 'SH_Goals',
-        'A.2': 'SH_Assists'
+        'A.2': 'SH_Assists',
+        'GWG': 'Game_Winning_Goals'
     }
     moneypuck_columns = ['name', 'team', 'position']
     rotowire_columns = ['Player Name', 'Team', 'Pos']
@@ -198,7 +200,7 @@ def merge_dataframes(moneypuck_df, rotowire_df, return_unmatched=False):
         rotowire_df.assign(_rw_row_id=range(len(rotowire_df))),
         on='_rw_row_id', validate='one_to_one'
     )
-    fantasy_columns = ['+/-', 'Assists', 'PP_Goals', 'PP_Assists', 'SH_Goals', 'SH_Assists']
+    fantasy_columns = ['+/-', 'Assists', 'PP_Goals', 'PP_Assists', 'SH_Goals', 'SH_Assists', 'Game_Winning_Goals']
     merged_df = moneypuck_df.merge(
         rw_with_ids[['playerId'] + fantasy_columns], on='playerId', validate='one_to_one'
     )

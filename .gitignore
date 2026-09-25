@@ -1,2 +1,5 @@
 __pycache__
 models
+predictions
+unmatched_players.csv
+notebooks/.ipynb_checkpoints/
